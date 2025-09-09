@@ -1,0 +1,60 @@
+/**
+    Fichier : health.proto
+    Permet de définir des messages et des services pour les communications réseau
+    dans un format indépendant du langage et optimisé pour la sérialisation.
+ */
+syntax = "proto3";
+
+package health;
+
+option go_package = "gen/go/health";
+
+/**
+COMPILATION
+
+protoc --proto_path=proto --go_out=. --go-grpc_out=. proto/health.proto
+
+      --proto_path : chemin vers le dossier contenant les fichiers .proto
+      --go_out : chemin vers le dossier où générer les fichiers Go
+      --go-grpc_out : chemin vers le dossier où générer les fichiers Go pour gRPC
+ */
+
+/**
+  Message envoyé pour faire un health check sur une liste d'URLs.
+  = 1 sert d'id
+ */
+message HealthCheckRequest {
+    repeated string urls = 1;
+}
+
+/**
+  Enum simple pour représenter le statut d'un check.
+ */
+enum CheckStatus {
+  CHECK_STATUS_UNSPECIFIED = 0;
+  CHECK_STATUS_OK = 1;
+  CHECK_STATUS_ERROR = 2;
+}
+
+/**
+  Résultat d'un health check pour une ou des URLs donnée.
+ */
+message HealthCheckResult {
+    CheckStatus status = 1; // Le statut du check
+    string error_message = 2; // Message d'erreur en cas d'échec
+}
+
+/**
+  Réponse envoyée par le serveur après un health check
+ */
+message HealthCheckResponse {
+  map<string, HealthCheckResult> results = 1;
+}
+
+/**
+  Service qui sera exposé par le serveur de health check.
+  utilise gRPC pour la communication.
+ */
+service HealthChecker {
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+}
