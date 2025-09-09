@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	workerAddr = "localhost:50051"
+	workerAddr = "health-worker:50051"
 )
 
 func main() {
