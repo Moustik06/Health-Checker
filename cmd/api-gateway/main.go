@@ -34,9 +34,10 @@ func main() {
 	mainMux := http.NewServeMux()
 	mainMux.HandleFunc("/check", handler.CheckURLs)
 
+	handlerFinal := gateway.RecoveryMiddleware(mainMux)
 	server := &http.Server{
 		Addr:    httpPort,
-		Handler: mainMux,
+		Handler: handlerFinal,
 	}
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
