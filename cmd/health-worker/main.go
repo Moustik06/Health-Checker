@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	pb "github.com/moustik06/healthchecker/gen/go/health"
 	"github.com/moustik06/healthchecker/internal/worker"
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 const (
@@ -21,11 +26,23 @@ func main() {
 		log.Fatalf("Échec de l'écoute: %v", err)
 	}
 
-	s := grpc.NewServer()
-	pb.RegisterHealthCheckerServer(s, &worker.Server{})
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		s := grpc.NewServer()
+		pb.RegisterHealthCheckerServer(s, &worker.Server{})
 
-	log.Printf("Serveur gRPC démarré et à l'écoute sur %s", port)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("Échec du démarrage du serveur: %v", err)
+		log.Printf("Serveur gRPC démarré et à l'écoute sur %s", port)
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("Échec du démarrage du serveur: %v", err)
+		}
+	}()
+	<-stop
+	log.Println("Arrêt du serveur...")
+	_, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := lis.Close(); err != nil {
+		log.Fatalf("Erreur lors de l'arrêt du serveur: %v", err)
 	}
+	log.Println("Serveur arrêté.")
 }

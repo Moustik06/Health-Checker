@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/moustik06/healthchecker/internal/gateway"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 const (
 	workerAddr = "health-worker:50051"
+	httpPort   = ":8080"
 )
 
 func main() {
@@ -25,10 +31,28 @@ func main() {
 	log.Println("Connecté au service worker gRPC sur ", workerAddr)
 
 	handler := gateway.NewHandler(conn)
-	server := http.NewServeMux()
-	server.HandleFunc("/check", handler.CheckURLs)
-	if err := http.ListenAndServe(":8080", server); err != nil {
-		fmt.Printf("Échec du démarrage du serveur HTTP: %v\n", err)
+	mainMux := http.NewServeMux()
+	mainMux.HandleFunc("/check", handler.CheckURLs)
+
+	server := &http.Server{
+		Addr:    httpPort,
+		Handler: mainMux,
 	}
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			fmt.Printf("Échec du démarrage du serveur HTTP: %v\n", err)
+		}
+	}()
+	<-stop
+	log.Println("Arrêt du serveur HTTP...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Erreur lors de l'arrêt du serveur HTTP: %v", err)
+	}
+	log.Println("Serveur HTTP arrêté.")
 
 }
