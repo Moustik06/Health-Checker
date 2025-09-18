@@ -17,7 +17,8 @@ type Server struct {
 func (s *Server) Check(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
 	log.Printf("Appel gRPC reçu pour Check urls : %d\n", len(req.Urls))
 
-	workerPool, err := pool.New(5, time.Second*10)
+	metricsProvider := NewPrometheusMetricsProvider()
+	workerPool, err := pool.New(5, time.Second*10, metricsProvider)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "échec de la création du pool: %v", err)
 	}

@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'health-worker'
+    static_configs:
+      - targets: ['health-worker:9091']
+
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:9090']
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']

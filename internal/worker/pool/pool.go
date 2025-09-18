@@ -32,15 +32,21 @@ type Result struct {
 	ErrorMsg string // Message d'erreur si failure
 }
 
+type MetricsProvider interface {
+	IncChecksTotal(status string)
+	ObserveCheckDuration(duration time.Duration)
+}
+
 type WorkerPool struct {
 	numWorkers int
 	jobs       chan Job
 	results    chan Result
 	wg         sync.WaitGroup
 	httpClient *http.Client
+	metrics    MetricsProvider
 }
 
-func New(numWorkers int, clientTimeout time.Duration) (*WorkerPool, error) {
+func New(numWorkers int, clientTimeout time.Duration, metrics MetricsProvider) (*WorkerPool, error) {
 	pool := &WorkerPool{
 		numWorkers: numWorkers,
 		jobs:       make(chan Job, numWorkers*5), // x5 pour avoir assez de buffer si on envoie beaucoup de jobs d'un coup
@@ -48,6 +54,7 @@ func New(numWorkers int, clientTimeout time.Duration) (*WorkerPool, error) {
 		httpClient: &http.Client{
 			Timeout: clientTimeout,
 		},
+		metrics: metrics,
 	}
 
 	return pool, nil
@@ -68,19 +75,24 @@ func (wp *WorkerPool) worker(ctx context.Context, id int) {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, job.URL, nil)
 
 			if err != nil {
+				wp.metrics.IncChecksTotal("failure")
 				wp.results <- Result{URL: job.URL, Status: "failure", ErrorMsg: err.Error()}
 				continue // On passe au job suivant
 			}
 			resp, err := wp.httpClient.Do(req)
 			duration := time.Since(start) // Durée de la requête
 
+			wp.metrics.ObserveCheckDuration(duration)
+
 			if err != nil {
 				log.Printf("ERREUR de vérification pour %s: %v", job.URL, err)
+				wp.metrics.IncChecksTotal("failure")
 				wp.results <- Result{URL: job.URL, Status: "failure", ErrorMsg: err.Error()}
 				continue // On passe au job suivant
 			}
 			resp.Body.Close()
 			log.Printf("Vérification réussie pour %s en %v", job.URL, duration)
+			wp.metrics.IncChecksTotal("success")
 			wp.results <- Result{URL: job.URL, Status: "success"}
 
 		}

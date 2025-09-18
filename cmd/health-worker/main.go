@@ -5,9 +5,11 @@ import (
 	"fmt"
 	pb "github.com/moustik06/healthchecker/gen/go/health"
 	"github.com/moustik06/healthchecker/internal/worker"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,11 +17,20 @@ import (
 )
 
 const (
-	port = ":50051"
+	port        = ":50051"
+	metricsPort = ":9091"
 )
 
 func main() {
 	fmt.Println("Lancement du worker...")
+
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Printf("Serveur de métriques démarré sur %s\n", metricsPort)
+		if err := http.ListenAndServe(metricsPort, nil); err != nil {
+			log.Fatalf("Le serveur de métriques a échoué: %v", err)
+		}
+	}()
 
 	lis, err := net.Listen("tcp", port)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/moustik06/healthchecker/internal/gateway"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -15,12 +16,23 @@ import (
 )
 
 const (
-	workerAddr = "health-worker:50051"
-	httpPort   = ":8080"
+	workerAddr  = "health-worker:50051"
+	httpPort    = ":8080"
+	metricsPort = ":9090"
 )
 
 func main() {
 	fmt.Println("Lancement de la gateway...")
+
+	// --- PROMETHEUS ---
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		log.Printf("Serveur de métriques démarré sur %s", metricsPort)
+		if err := http.ListenAndServe(metricsPort, nil); err != nil {
+			log.Fatalf("Le serveur de métriques a échoué: %v", err)
+		}
+	}()
 
 	conn, err := grpc.NewClient(workerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -34,7 +46,8 @@ func main() {
 	mainMux := http.NewServeMux()
 	mainMux.HandleFunc("/check", handler.CheckURLs)
 
-	handlerFinal := gateway.RecoveryMiddleware(mainMux)
+	handlerFinal := gateway.RecoveryMiddleware(gateway.PrometheusMiddleware(mainMux))
+
 	server := &http.Server{
 		Addr:    httpPort,
 		Handler: handlerFinal,

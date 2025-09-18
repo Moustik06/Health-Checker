@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"google.golang.org/grpc"
 	"log"
 	"net/http"
@@ -46,8 +47,13 @@ func (h *Handler) CheckURLs(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.client.Check(ctx, &pb.HealthCheckRequest{Urls: req.URLs})
 	if err != nil {
-		http.Error(w, "Erreur lors de l'appel au service worker: "+err.Error(), http.StatusInternalServerError)
-		log.Fatal("Erreur lors de l'appel au service worker: ", err)
+
+		if errors.Is(err, context.Canceled) {
+			log.Println("Request canceled by client.")
+			return
+		}
+		log.Printf("Erreur lors de l'appel au service worker: %v", err)
+		http.Error(w, "Erreur interne du serveur", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
