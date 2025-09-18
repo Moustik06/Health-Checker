@@ -22,6 +22,16 @@ var (
 			Buckets: prometheus.LinearBuckets(0.1, 0.1, 10),
 		},
 	)
+
+	CacheHits = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "app_cache_hits_total",
+		Help: "Nombre total de requêtes servies depuis le cache.",
+	})
+
+	CacheMisses = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "app_cache_misses_total",
+		Help: "Nombre total de requêtes non trouvées dans le cache.",
+	})
 )
 
 type PrometheusMetricsProvider struct{}
@@ -36,4 +46,12 @@ func (p *PrometheusMetricsProvider) IncChecksTotal(status string) {
 
 func (p *PrometheusMetricsProvider) ObserveCheckDuration(duration time.Duration) {
 	URLCheckDuration.Observe(duration.Seconds())
+}
+
+func (p *PrometheusMetricsProvider) IncCacheHit() {
+	CacheHits.Inc()
+}
+
+func (p *PrometheusMetricsProvider) IncCacheMiss() {
+	CacheMisses.Inc()
 }

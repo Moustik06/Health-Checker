@@ -7,6 +7,8 @@ services:
       - "50051:50051"
     networks:
       - healthchecker-net
+    depends_on:
+      - redis
 
   api-gateway:
     build:
@@ -55,6 +57,15 @@ services:
       - healthchecker-net
     depends_on:
       - prometheus
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    expose:
+      - "6379"
+    networks:
+      - healthchecker-net
+
 networks:
   healthchecker-net:
     driver: bridge
